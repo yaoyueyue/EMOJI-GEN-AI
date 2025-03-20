@@ -93,12 +93,10 @@ export function EmojiDisplay() {
         {/* The emoji image */}
         <div className="aspect-square flex items-center justify-center bg-gray-50 rounded-md overflow-hidden">
           {currentEmoji ? (
-            <Image 
+            <img 
               src={currentEmoji.imageUrl}
               alt={currentEmoji.prompt}
-              width={200}
-              height={200}
-              className="object-contain"
+              className="w-full h-full object-contain"
             />
           ) : (
             <div className="text-gray-300">No emoji generated</div>

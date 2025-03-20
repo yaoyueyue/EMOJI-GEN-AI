@@ -1,6 +1,5 @@
 "use client"
 import { Navbar } from "@/components/navbar"
-import { EmojiDisplay } from "@/components/emoji-display"
 import { EmojiHistory } from "@/components/emoji-history"
 import { EmojiCreatorForm } from "@/components/emoji-creator-form"
 import { EmojiProvider } from "@/components/emoji-provider"
@@ -20,7 +19,6 @@ export default function EmojiGenerator() {
             }}
           >
             <EmojiCreatorForm />
-            <EmojiDisplay />
             <EmojiHistory />
           </div>
         </div>
