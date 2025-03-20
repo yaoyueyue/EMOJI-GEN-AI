@@ -1,165 +1,128 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Download, Clipboard, Heart, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useEmoji } from "@/components/emoji-provider"
 import { useToast } from "@/hooks/use-toast"
+import Image from "next/image"
 
 export function EmojiDisplay() {
   const { currentEmoji, toggleFavorite } = useEmoji()
   const { toast } = useToast()
   const [copied, setCopied] = useState(false)
+  
+  // Log when current emoji changes
+  useEffect(() => {
+    console.log("EmojiDisplay currentEmoji:", currentEmoji)
+  }, [currentEmoji])
 
   const handleCopy = async () => {
     if (!currentEmoji) return
 
     try {
-      // In a real app, you would fetch the image and copy it
-      // For now, we'll just simulate copying
+      await navigator.clipboard.writeText(currentEmoji.prompt)
       setCopied(true)
       toast({
         title: "Copied to clipboard! 📋",
-        description: "Emoji has been copied to your clipboard",
+        description: currentEmoji.prompt,
       })
-
       setTimeout(() => setCopied(false), 2000)
     } catch (error) {
       toast({
-        title: "Copy failed 😢",
-        description: "Could not copy emoji to clipboard",
+        title: "Failed to copy 😢",
+        description: "Could not copy to clipboard",
         variant: "destructive",
       })
     }
   }
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     if (!currentEmoji) return
-
-    // In a real app, you would download the actual image
-    // For now, we'll just show a toast
-    toast({
-      title: "Download started! 🎉",
-      description: "Your emoji is being downloaded",
-    })
+    
+    try {
+      // Fetch the image
+      const response = await fetch(currentEmoji.imageUrl)
+      const blob = await response.blob()
+      
+      // Create a download link
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.style.display = 'none'
+      a.href = url
+      
+      // Set the filename
+      const filename = `emoji-${currentEmoji.prompt.replace(/\s+/g, '-').toLowerCase()}.png`
+      a.download = filename
+      
+      // Trigger the download
+      document.body.appendChild(a)
+      a.click()
+      
+      // Clean up
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+      
+      toast({
+        title: "Download complete! 🎉",
+        description: "Your emoji has been downloaded",
+      })
+    } catch (error) {
+      toast({
+        title: "Download failed 😢",
+        description: "Could not download the emoji",
+        variant: "destructive",
+      })
+    }
   }
 
-  const handleFavorite = () => {
-    if (!currentEmoji) return
-    toggleFavorite(currentEmoji.id)
-
-    toast({
-      title: currentEmoji.isFavorite ? "Removed from favorites 💔" : "Added to favorites ❤️",
-      description: currentEmoji.isFavorite
-        ? "Emoji has been removed from your favorites"
-        : "Emoji has been added to your favorites",
-    })
-  }
-
+  console.log("Rendering EmojiDisplay with:", 
+    currentEmoji ? {
+      id: currentEmoji.id,
+      prompt: currentEmoji.prompt,
+      imageUrl: currentEmoji.imageUrl
+    } : 'null')
+  
   return (
-    <AnimatePresence mode="wait">
-      {currentEmoji ? (
-        <motion.div
-          key="emoji-display"
-          initial={{ opacity: 0, scale: 0.8 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 0.8 }}
-          transition={{ duration: 0.5, type: "spring", bounce: 0.4 }}
-          className="w-full max-w-md p-6 rounded-3xl bg-card shadow-lg border-2 border-primary/20"
-        >
-          <div className="flex flex-col items-center gap-4">
-            <div className="text-sm text-muted-foreground bg-muted px-4 py-2 rounded-full">
-              <span className="font-medium">Prompt:</span> {currentEmoji.prompt}
-            </div>
-
-            <motion.div
-              className="relative w-56 h-56 bg-gradient-to-br from-accent/30 to-primary/20 rounded-2xl overflow-hidden shadow-inner p-2"
-              whileHover={{ scale: 1.03 }}
-              transition={{ type: "spring", stiffness: 400, damping: 10 }}
-            >
-              <motion.img
-                src={currentEmoji.imageUrl}
-                alt={currentEmoji.prompt}
-                className="w-full h-full object-contain"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.2 }}
-              />
-            </motion.div>
-
-            <div className="flex gap-3 w-full justify-center mt-2">
-              <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={handleDownload}
-                  className="rounded-full h-12 w-12 bg-secondary/10 border-2 border-secondary/30 text-secondary-foreground"
-                >
-                  <Download className="h-5 w-5" />
-                  <span className="sr-only">Download</span>
-                </Button>
-              </motion.div>
-
-              <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={handleCopy}
-                  className={`rounded-full h-12 w-12 ${copied ? "bg-accent/30 border-accent" : "bg-accent/10 border-2 border-accent/30"}`}
-                >
-                  <Clipboard className="h-5 w-5" />
-                  <span className="sr-only">Copy to clipboard</span>
-                </Button>
-              </motion.div>
-
-              <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={handleFavorite}
-                  className={`rounded-full h-12 w-12 ${currentEmoji.isFavorite ? "bg-primary/30 border-primary" : "bg-primary/10 border-2 border-primary/30"}`}
-                >
-                  <Heart className={`h-5 w-5 ${currentEmoji.isFavorite ? "fill-primary" : ""}`} />
-                  <span className="sr-only">Favorite</span>
-                </Button>
-              </motion.div>
-            </div>
-          </div>
-        </motion.div>
-      ) : (
-        <motion.div
-          key="emoji-placeholder"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="w-full max-w-md p-8 rounded-3xl bg-gradient-to-br from-accent/10 to-primary/5 border-2 border-dashed border-primary/20 flex flex-col items-center justify-center"
-          style={{ minHeight: "320px" }}
-        >
-          <div className="text-center space-y-4">
-            <motion.div
-              animate={{
-                y: [0, -10, 0],
-                rotate: [0, 5, 0, -5, 0],
-              }}
-              transition={{
-                duration: 5,
-                repeat: Number.POSITIVE_INFINITY,
-                repeatType: "reverse",
-              }}
-            >
-              <div className="bg-primary/10 p-4 rounded-full inline-block">
-                <Sparkles className="h-12 w-12 text-primary/70" />
-              </div>
-            </motion.div>
-            <h3 className="text-xl font-medium text-foreground">Your emoji will appear here</h3>
-            <p className="text-sm text-muted-foreground max-w-xs mx-auto">
-              Enter a description and click "Make My Emoji" to generate something magical! ✨
-            </p>
-          </div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+    <div className="rounded-lg bg-white p-4 shadow-sm">
+      <h2>Emoji Display</h2>
+      
+      {/* Image container with relative positioning */}
+      <div className="relative group">
+        {/* The emoji image */}
+        <div className="aspect-square flex items-center justify-center bg-gray-50 rounded-md overflow-hidden">
+          {currentEmoji ? (
+            <Image 
+              src={currentEmoji.imageUrl}
+              alt={currentEmoji.prompt}
+              width={200}
+              height={200}
+              className="object-contain"
+            />
+          ) : (
+            <div className="text-gray-300">No emoji generated</div>
+          )}
+        </div>
+        
+        {/* Overlay buttons that appear on hover */}
+        <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 rounded-md">
+          <Button size="sm" variant="secondary" className="h-8 w-8 p-0" onClick={handleDownload}>
+            <Download className="h-4 w-4" />
+          </Button>
+          <Button size="sm" variant="secondary" className="h-8 w-8 p-0" onClick={handleCopy}>
+            <Clipboard className="h-4 w-4" />
+          </Button>
+          <Button 
+            size="sm" 
+            variant={currentEmoji?.isFavorite ? "default" : "outline"}
+            onClick={() => currentEmoji?.id && toggleFavorite(currentEmoji.id)}
+          >
+            <Heart className={`h-4 w-4 ${currentEmoji?.isFavorite ? "fill-current" : ""}`} />
+          </Button>
+        </div>
+      </div>
+    </div>
   )
 }
 

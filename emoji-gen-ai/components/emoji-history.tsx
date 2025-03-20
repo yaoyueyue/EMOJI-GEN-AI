@@ -1,13 +1,13 @@
 "use client"
 
-import { useRef } from "react"
-import { motion } from "framer-motion"
+import { useRef, useState } from "react"
 import { ChevronLeft, ChevronRight, History } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useEmoji } from "@/components/emoji-provider"
 
 export function EmojiHistory() {
-  const { emojiHistory, setCurrentEmoji } = useEmoji()
+  const { emojiHistory, currentEmoji, setCurrentEmoji } = useEmoji()
+  const [hoveredId, setHoveredId] = useState<string | null>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
 
   const scroll = (direction: "left" | "right") => {
@@ -35,7 +35,10 @@ export function EmojiHistory() {
         </div>
 
         <div className="flex gap-1">
-          <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+          <div 
+            className="hover:scale-110 active:scale-90 transition"
+            style={{ transformOrigin: 'center' }}
+          >
             <Button
               variant="ghost"
               size="icon"
@@ -45,8 +48,11 @@ export function EmojiHistory() {
               <ChevronLeft className="h-4 w-4" />
               <span className="sr-only">Scroll left</span>
             </Button>
-          </motion.div>
-          <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+          </div>
+          <div 
+            className="hover:scale-110 active:scale-90 transition"
+            style={{ transformOrigin: 'center' }}
+          >
             <Button
               variant="ghost"
               size="icon"
@@ -56,7 +62,7 @@ export function EmojiHistory() {
               <ChevronRight className="h-4 w-4" />
               <span className="sr-only">Scroll right</span>
             </Button>
-          </motion.div>
+          </div>
         </div>
       </div>
 
@@ -66,30 +72,45 @@ export function EmojiHistory() {
         style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
       >
         {emojiHistory.map((emoji, index) => (
-          <motion.div
+          <div
             key={emoji.id}
-            initial={{ opacity: 0, scale: 0.8, x: -20 }}
-            animate={{ opacity: 1, scale: 1, x: 0 }}
-            transition={{ delay: index * 0.1, type: "spring" }}
-            whileHover={{ scale: 1.1, y: -5 }}
-            className="flex-shrink-0 snap-start"
+            className={`relative aspect-square rounded-xl overflow-hidden cursor-pointer border-2 flex-shrink-0 snap-start ${
+              currentEmoji?.id === emoji.id ? "border-primary" : "border-transparent"
+            } hover:scale-105 transition-transform`}
+            style={{
+              opacity: 0,
+              scale: 0.8,
+              animation: `fadeIn 0.5s forwards ${index * 0.1}s, scaleIn 0.5s forwards ${index * 0.1}s`,
+              transformOrigin: 'center'
+            }}
+            onMouseEnter={() => setHoveredId(emoji.id)}
+            onMouseLeave={() => setHoveredId(null)}
+            onClick={() => setCurrentEmoji(emoji)}
           >
-            <button
-              onClick={() => setCurrentEmoji(emoji)}
-              className="w-16 h-16 rounded-2xl bg-gradient-to-br from-accent/20 to-primary/10 overflow-hidden border-2 border-primary/20 hover:border-primary/50 transition-colors shadow-sm"
-            >
-              <img
-                src={emoji.imageUrl || "/placeholder.svg"}
-                alt={emoji.prompt}
-                className="w-full h-full object-contain p-1"
-              />
-            </button>
-            {emoji.isFavorite && (
-              <div className="flex justify-center mt-1">
-                <span className="text-xs">❤️</span>
+            <img 
+              src={emoji.imageUrl || "/placeholder.svg"} 
+              alt={emoji.prompt}
+              className="w-full h-full object-cover"
+            />
+            
+            {hoveredId === emoji.id && (
+              <div
+                className="absolute inset-0 bg-black/40 flex items-center justify-center p-2"
+                style={{
+                  opacity: 0,
+                  animation: 'fadeIn 0.3s forwards',
+                }}
+              >
+                <p className="text-white text-xs text-center line-clamp-3">
+                  {emoji.prompt}
+                </p>
               </div>
             )}
-          </motion.div>
+            
+            {emoji.isFavorite && (
+              <div className="absolute top-2 right-2 text-xs">❤️</div>
+            )}
+          </div>
         ))}
       </div>
     </div>

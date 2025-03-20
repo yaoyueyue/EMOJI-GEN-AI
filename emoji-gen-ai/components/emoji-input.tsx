@@ -45,6 +45,7 @@ export function EmojiInput() {
 
   return (
     <div className="w-full max-w-xl">
+      {isGenerating && <div className="text-sm text-red-500">Generating emoji... Please wait.</div>}
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-2">
           <label htmlFor="prompt" className="text-lg font-medium flex items-center gap-2">
