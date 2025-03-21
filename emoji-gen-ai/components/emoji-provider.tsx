@@ -1,8 +1,6 @@
 "use client"
 
-import React, { createContext, useContext, useState, ReactNode, useEffect } from "react"
-import { useUser } from "@clerk/nextjs"
-import { Emoji } from "@/lib/supabase"
+import React, { createContext, useContext, useState, ReactNode } from "react"
 
 // Define the emoji type
 export interface Emoji {
@@ -15,11 +13,11 @@ export interface Emoji {
 
 // Define the context type with all required functions
 export interface EmojiContextType {
-  emojis: Emoji[]
-  isLoading: boolean
-  error: string | null
-  refreshEmojis: () => Promise<void>
-  likeEmoji: (emojiId: string, like: boolean) => Promise<void>
+  emojiHistory: Emoji[]
+  currentEmoji: Emoji | null
+  setCurrentEmoji: (emoji: Emoji) => void
+  addEmoji: (emoji: Emoji) => void  // Make sure this is defined
+  toggleFavorite: (id: string) => void
 }
 
 // Create the context with a default value
@@ -27,80 +25,41 @@ const EmojiContext = createContext<EmojiContextType | undefined>(undefined)
 
 // Provider component
 export function EmojiProvider({ children }: { children: ReactNode }) {
-  const [emojis, setEmojis] = useState<Emoji[]>([])
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const { isSignedIn, isLoaded } = useUser()
+  const [emojiHistory, setEmojiHistory] = useState<Emoji[]>([])
+  const [currentEmoji, setCurrentEmoji] = useState<Emoji | null>(null)
 
-  const fetchEmojis = async () => {
-    if (!isSignedIn) return
-    
-    setIsLoading(true)
-    setError(null)
-    
-    try {
-      const response = await fetch("/api/emoji/list")
-      
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || "Failed to fetch emojis")
-      }
-      
-      const data = await response.json()
-      setEmojis(data.emojis || [])
-    } catch (err: any) {
-      setError(err.message || "An error occurred while fetching emojis")
-      console.error("Error fetching emojis:", err)
-    } finally {
-      setIsLoading(false)
-    }
+  // Add a new emoji to the history
+  const addEmoji = (emoji: Emoji) => {
+    setEmojiHistory(prev => [emoji, ...prev])
+    setCurrentEmoji(emoji)
   }
 
-  // Fetch emojis when the component mounts or when the user signs in
-  useEffect(() => {
-    if (isLoaded && isSignedIn) {
-      fetchEmojis()
-    }
-  }, [isLoaded, isSignedIn])
-
-  const likeEmoji = async (emojiId: string, like: boolean) => {
-    if (!isSignedIn) return
-    
-    try {
-      const response = await fetch("/api/emoji/like", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ emojiId, like }),
-      })
-      
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || "Failed to update like status")
-      }
-      
-      // Update local state
-      setEmojis(prevEmojis => 
-        prevEmojis.map(emoji => 
-          emoji.id === emojiId 
-            ? { ...emoji, isFavorite: like }
-            : emoji
-        )
+  // Toggle favorite status for an emoji
+  const toggleFavorite = (id: string) => {
+    setEmojiHistory(prev => 
+      prev.map(emoji => 
+        emoji.id === id 
+          ? { ...emoji, isFavorite: !emoji.isFavorite } 
+          : emoji
       )
-    } catch (err: any) {
-      console.error("Error liking emoji:", err)
+    )
+    
+    if (currentEmoji && currentEmoji.id === id) {
+      setCurrentEmoji({
+        ...currentEmoji,
+        isFavorite: !currentEmoji.isFavorite
+      })
     }
   }
 
   return (
     <EmojiContext.Provider
       value={{
-        emojis,
-        isLoading,
-        error,
-        refreshEmojis: fetchEmojis,
-        likeEmoji,
+        emojiHistory,
+        currentEmoji,
+        setCurrentEmoji,
+        addEmoji,
+        toggleFavorite,
       }}
     >
       {children}

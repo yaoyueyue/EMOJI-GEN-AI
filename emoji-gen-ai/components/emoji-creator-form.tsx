@@ -1,90 +1,197 @@
 "use client"
 
-import { useState } from "react"
-import { useUser } from "@clerk/nextjs"
+import { Zap, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Loader2 } from "lucide-react"
+import { useState, useEffect, useRef } from "react"
+import { useEmoji } from "@/components/emoji-provider"
+
+// Array of fun emoji prompt suggestions
+const PROMPT_SUGGESTIONS = [
+  "Happy pizza",
+  "Crying cloud",
+  "Dancing avocado",
+  "Sleepy cat",
+  "Excited robot",
+  "Surprised donut",
+  "Laughing taco",
+  "Grumpy coffee",
+  "Loving planet",
+  "Confused banana"
+]
 
 export function EmojiCreatorForm() {
   const [prompt, setPrompt] = useState("")
-  const [isGenerating, setIsGenerating] = useState(false)
-  const [error, setError] = useState("")
-  const { isSignedIn } = useUser()
+  const [isLoading, setIsLoading] = useState(false)
+  const { addEmoji, setCurrentEmoji } = useEmoji()
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [examplePrompt, setExamplePrompt] = useState("Happy pizza")
 
-  async function handleGenerateEmoji(e: React.FormEvent) {
-    e.preventDefault()
+  // Get a random prompt on initial load
+  useEffect(() => {
+    setExamplePrompt(getRandomPrompt())
+  }, [])
+
+  const getRandomPrompt = () => {
+    const randomIndex = Math.floor(Math.random() * PROMPT_SUGGESTIONS.length)
+    return PROMPT_SUGGESTIONS[randomIndex]
+  }
+
+  const handleCreateEmoji = async (customPrompt?: string) => {
+    const userPrompt = customPrompt || prompt
     
-    if (!isSignedIn) {
-      setError("Please sign in to generate emojis")
+    if (!userPrompt) {
+      console.log("No prompt value found")
       return
     }
-    
-    if (!prompt.trim()) {
-      setError("Please enter a prompt")
-      return
-    }
-    
-    setError("")
-    setIsGenerating(true)
+
+    // Append the Apple emoji style instruction to the user's prompt
+    const enhancedPrompt = `A TOK Emoji of ${userPrompt}. `
+
+    setIsLoading(true)
+    setErrorMessage(null)
+    console.log("Sending emoji generation request for:", userPrompt)
+    console.log("Enhanced prompt:", enhancedPrompt)
     
     try {
-      const response = await fetch("/api/emoji/generate", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ prompt: prompt.trim() }),
+      // Get the current origin for absolute URL construction
+      const origin = window.location.origin
+      
+      // Use the real emoji generation API with enhanced prompt and additional parameters
+      const res = await fetch(`${origin}/api/generate-emoji`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          width: 1024,
+          height: 1024,
+          prompt: enhancedPrompt,
+          refine: "no_refiner",
+          scheduler: "K_EULER",
+          lora_scale: 0.6,
+          num_outputs: 1,
+          guidance_scale: 7.5,
+          apply_watermark: false,
+          high_noise_frac: 0.8,
+          negative_prompt: "",
+          prompt_strength: 0.8,
+          num_inference_steps: 50
+        })
       })
       
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || "Failed to generate emoji")
+      console.log("API response status:", res.status)
+      
+      // Check if response is OK
+      if (!res.ok) {
+        const errorText = await res.text()
+        console.error(`API error (${res.status}):`, errorText)
+        throw new Error(`API returned status ${res.status}`)
       }
       
-      // If successful, clear the prompt and refresh emojis (handled by parent context)
-      setPrompt("")
-    } catch (err: any) {
-      setError(err.message || "An error occurred while generating the emoji")
+      // Try to parse as JSON with error handling
+      let data
+      try {
+        const text = await res.text()
+        console.log("Raw response:", text)
+        
+        if (!text) {
+          throw new Error("Empty response from API")
+        }
+        
+        data = JSON.parse(text)
+      } catch (parseError) {
+        console.error("Failed to parse JSON response:", parseError)
+        throw new Error("Invalid JSON response from API")
+      }
+      
+      console.log('API Response data:', data)
+
+      let imageUrl = null
+
+      if (data.imageUrl && typeof data.imageUrl === 'string') {
+        imageUrl = data.imageUrl
+      } else if (data.output && Array.isArray(data.output) && data.output.length > 0) {
+        // Some APIs return { output: ["url"] } format
+        imageUrl = data.output[0]
+      }
+
+      console.log('Extracted imageUrl:', imageUrl)
+
+      if (imageUrl) {
+        // Create new emoji object with the ORIGINAL prompt (not enhanced)
+        const newEmoji = {
+          id: Date.now().toString(),
+          prompt: userPrompt, // Store original prompt for display
+          imageUrl: imageUrl,
+          createdAt: new Date(),
+          isFavorite: false
+        }
+        
+        // Add to emoji history and set as current emoji
+        if (addEmoji) {
+          addEmoji(newEmoji)
+          setCurrentEmoji(newEmoji)
+        }
+        
+        setPrompt("") // Clear the prompt after successful generation
+      } else {
+        setErrorMessage("API response didn't contain a valid image URL")
+      }
+    } catch (err) {
+      console.error('Error:', err)
+      setErrorMessage(err instanceof Error ? err.message : 'Unknown error')
     } finally {
-      setIsGenerating(false)
+      setIsLoading(false)
     }
   }
 
+  const handleExampleClick = () => {
+    const randomPrompt = getRandomPrompt()
+    setExamplePrompt(randomPrompt) // Update the displayed prompt
+    setPrompt(randomPrompt) // Set the input field
+    handleCreateEmoji(randomPrompt) // Generate emoji with this prompt
+  }
+
   return (
-    <form onSubmit={handleGenerateEmoji} className="w-full space-y-4">
-      <div className="flex flex-col gap-2">
-        <div className="flex gap-2">
-          <Input
-            placeholder="Enter a prompt to generate an emoji..."
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            disabled={isGenerating}
-            className="flex-grow"
-          />
-          <Button 
-            type="submit" 
-            disabled={isGenerating || !prompt.trim() || !isSignedIn}
-          >
-            {isGenerating ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Generating...
-              </>
-            ) : (
-              "Generate"
-            )}
-          </Button>
+    <div className="w-full max-w-2xl mb-4 relative">
+      <input
+        type="text"
+        placeholder="Describe your emoji..."
+        className="w-full h-48 px-5 rounded-xl border border-blue-100/80 focus:border-blue-200/80 outline-none text-gray-600 shadow-sm text-lg"
+        value={prompt}
+        onChange={(e) => setPrompt(e.target.value)}
+        disabled={isLoading}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault()
+            handleCreateEmoji()
+          }
+        }}
+      />
+      
+      <Button 
+        onClick={handleExampleClick}
+        variant="ghost" 
+        size="sm"
+        className="absolute right-3 top-3 bg-purple-100/50 hover:bg-purple-200/60 text-purple-400 hover:text-purple-500 px-3 py-1 rounded-full text-xs h-auto"
+        disabled={isLoading}
+      >
+        <Sparkles className="h-3 w-3 mr-1" />
+        Try: "{examplePrompt}"
+      </Button>
+      
+      {errorMessage && (
+        <div className="mt-2 text-sm text-red-500">
+          Error: {errorMessage}
         </div>
-        
-        {error && (
-          <p className="text-red-500 text-sm">{error}</p>
-        )}
-        
-        <div className="text-xs text-gray-500">
-          Examples: "a happy cat", "a robot dancing", "a taco with sunglasses"
-        </div>
-      </div>
-    </form>
+      )}
+      
+      <Button 
+        className="w-full mt-3 h-12 bg-gradient-to-r from-pink-300/80 to-purple-300/80 hover:from-pink-300 hover:to-purple-300 rounded-xl text-white border-0"
+        onClick={() => handleCreateEmoji()}
+        disabled={isLoading}
+      >
+        <Zap className="mr-2 h-4 w-4" />
+        {isLoading ? "Generating AI Emoji..." : "Create Emoji"}
+      </Button>
+    </div>
   )
 } 
