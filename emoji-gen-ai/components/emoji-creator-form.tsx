@@ -1,6 +1,6 @@
 "use client"
 
-import { Zap, Sparkles } from "lucide-react"
+import { Sparkles, Zap } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useState, useEffect, useRef } from "react"
 import { useEmoji } from "@/components/emoji-provider"
@@ -25,6 +25,7 @@ export function EmojiCreatorForm() {
   const { addEmoji, setCurrentEmoji } = useEmoji()
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [examplePrompt, setExamplePrompt] = useState("Happy pizza")
+  const inputRef = useRef<HTMLInputElement>(null)
 
   // Get a random prompt on initial load
   useEffect(() => {
@@ -39,42 +40,50 @@ export function EmojiCreatorForm() {
   const handleCreateEmoji = async (customPrompt?: string) => {
     const userPrompt = customPrompt || prompt
     
+    // Log the actual prompt being used
+    console.log("User prompt value:", userPrompt)
+    console.log("Input field current value:", inputRef.current?.value)
+    
     if (!userPrompt) {
+      setErrorMessage("Please enter a prompt description")
       console.log("No prompt value found")
       return
     }
 
-    // Append the Apple emoji style instruction to the user's prompt
-    const enhancedPrompt = `A TOK Emoji of ${userPrompt}. `
-
+    // Don't modify the user's prompt for logging purposes
+    console.log("Sending emoji generation request for:", userPrompt)
+    
     setIsLoading(true)
     setErrorMessage(null)
-    console.log("Sending emoji generation request for:", userPrompt)
-    console.log("Enhanced prompt:", enhancedPrompt)
     
     try {
       // Get the current origin for absolute URL construction
       const origin = window.location.origin
       
+      // Log the actual request
+      const requestBody = {
+        prompt: userPrompt,
+        width: 1024,
+        height: 1024,
+        refine: "no_refiner",
+        scheduler: "K_EULER",
+        lora_scale: 0.6,
+        num_outputs: 1,
+        guidance_scale: 7.5,
+        apply_watermark: false,
+        high_noise_frac: 0.8,
+        negative_prompt: "",
+        prompt_strength: 0.8,
+        num_inference_steps: 50
+      }
+      
+      console.log("Sending request with body:", JSON.stringify(requestBody))
+      
       // Use the real emoji generation API with enhanced prompt and additional parameters
       const res = await fetch(`${origin}/api/generate-emoji`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          width: 1024,
-          height: 1024,
-          prompt: enhancedPrompt,
-          refine: "no_refiner",
-          scheduler: "K_EULER",
-          lora_scale: 0.6,
-          num_outputs: 1,
-          guidance_scale: 7.5,
-          apply_watermark: false,
-          high_noise_frac: 0.8,
-          negative_prompt: "",
-          prompt_strength: 0.8,
-          num_inference_steps: 50
-        })
+        body: JSON.stringify(requestBody)
       })
       
       console.log("API response status:", res.status)
@@ -137,7 +146,20 @@ export function EmojiCreatorForm() {
       }
     } catch (err) {
       console.error('Error:', err)
-      setErrorMessage(err instanceof Error ? err.message : 'Unknown error')
+      
+      // Check if it's an NSFW error from the response
+      let errorMsg = 'Unknown error'
+      
+      if (err instanceof Error) {
+        errorMsg = err.message
+        
+        // Check if the error message contains NSFW or content policy info
+        if (errorMsg.includes('NSFW') || errorMsg.includes('content')) {
+          errorMsg = "We can't generate this image due to content safety filters. Please try a different prompt."
+        }
+      }
+      
+      setErrorMessage(errorMsg)
     } finally {
       setIsLoading(false)
     }
@@ -153,11 +175,15 @@ export function EmojiCreatorForm() {
   return (
     <div className="w-full max-w-2xl mb-4 relative">
       <input
+        ref={inputRef}
         type="text"
         placeholder="Describe your emoji..."
         className="w-full h-48 px-5 rounded-xl border border-blue-100/80 focus:border-blue-200/80 outline-none text-gray-600 shadow-sm text-lg"
         value={prompt}
-        onChange={(e) => setPrompt(e.target.value)}
+        onChange={(e) => {
+          console.log("Input changed:", e.target.value)
+          setPrompt(e.target.value)
+        }}
         disabled={isLoading}
         onKeyDown={(e) => {
           if (e.key === 'Enter' && !e.shiftKey) {
@@ -185,7 +211,7 @@ export function EmojiCreatorForm() {
       )}
       
       <Button 
-        className="w-full mt-3 h-12 bg-gradient-to-r from-pink-300/80 to-purple-300/80 hover:from-pink-300 hover:to-purple-300 rounded-xl text-white border-0"
+        className="w-full mt-3 h-14 bg-gradient-to-r from-pink-300/80 to-purple-300/80 hover:from-pink-300 hover:to-purple-300 rounded-xl text-white border-0"
         onClick={() => handleCreateEmoji()}
         disabled={isLoading}
       >

@@ -6,6 +6,7 @@ const nextConfig = {
   images: {
     domains: ['replicate.delivery'],
   },
+  reactStrictMode: true,
 }
 
 module.exports = nextConfig 
