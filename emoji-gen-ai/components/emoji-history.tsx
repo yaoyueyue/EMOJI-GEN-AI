@@ -1,16 +1,20 @@
 "use client"
 
-import { useRef, useState } from "react"
-import { ChevronLeft, ChevronRight, History, Download, Clipboard, Heart } from "lucide-react"
+import { useEffect, useState, useRef } from "react"
+import { ChevronLeft, ChevronRight, History, Download, Clipboard, Heart, Copy, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useEmoji } from "@/components/emoji-provider"
 import { useToast } from "@/hooks/use-toast"
+import { useUser } from "@clerk/nextjs"
+import Image from "next/image"
 
 export function EmojiHistory() {
-  const { emojiHistory, currentEmoji, setCurrentEmoji, toggleFavorite } = useEmoji()
+  const { emojis, isLoading, error, likeEmoji } = useEmoji()
+  const { isSignedIn } = useUser()
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const { toast } = useToast()
+  const [copiedId, setCopiedId] = useState<string | null>(null)
 
   const scroll = (direction: "left" | "right") => {
     if (!scrollContainerRef.current) return
@@ -24,189 +28,117 @@ export function EmojiHistory() {
     })
   }
 
-  const handleCopy = async (emoji: any) => {
+  const handleCopy = async (url: string, id: string) => {
     try {
-      // Fetch the image
-      const response = await fetch(emoji.imageUrl)
-      const blob = await response.blob()
-      
-      // Create a ClipboardItem with the image
-      const item = new ClipboardItem({
-        [blob.type]: blob
-      })
-      
-      // Copy to clipboard
-      await navigator.clipboard.write([item])
-      
-      toast({
-        title: "Image copied to clipboard! 📋",
-        description: "You can now paste the emoji in other applications",
-      })
-    } catch (error) {
-      console.error('Copy error:', error)
-      toast({
-        title: "Failed to copy image 😢",
-        description: "Your browser may not support copying images or the feature might be restricted",
-        variant: "destructive",
-      })
+      await navigator.clipboard.writeText(url)
+      setCopiedId(id)
+      setTimeout(() => setCopiedId(null), 2000)
+    } catch (err) {
+      console.error("Failed to copy:", err)
     }
   }
 
-  const handleDownload = async (emoji: any) => {
-    if (!emoji) return
-    
-    try {
-      // Fetch the image
-      const response = await fetch(emoji.imageUrl)
-      const blob = await response.blob()
-      
-      // Create a download link
-      const url = window.URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.style.display = 'none'
-      a.href = url
-      
-      // Set the filename
-      const filename = `emoji-${emoji.prompt.replace(/\s+/g, '-').toLowerCase()}.png`
-      a.download = filename
-      
-      // Trigger the download
-      document.body.appendChild(a)
-      a.click()
-      
-      // Clean up
-      window.URL.revokeObjectURL(url)
-      document.body.removeChild(a)
-      
-      toast({
-        title: "Download complete! 🎉",
-        description: "Your emoji has been downloaded",
-      })
-    } catch (error) {
-      toast({
-        title: "Download failed 😢",
-        description: "Could not download the emoji",
-        variant: "destructive",
-      })
-    }
+  const handleDownload = (url: string, prompt: string) => {
+    const link = document.createElement("a")
+    link.href = url
+    link.download = `emoji-${prompt.replace(/\s+/g, "-").substring(0, 20)}.png`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
   }
 
-  if (emojiHistory.length === 0) {
+  if (!isSignedIn) {
     return (
-      <div className="w-full max-w-2xl mx-auto text-center p-8 bg-purple-50/50 rounded-lg">
-        <History className="w-10 h-10 text-purple-200 mx-auto mb-2" />
-        <p className="text-purple-400">No emojis created yet</p>
-        <p className="text-sm text-purple-300 mt-1">Enter a prompt above to create your first emoji!</p>
+      <div className="w-full text-center p-8 bg-gray-50 rounded-lg">
+        <p className="text-gray-500">Please sign in to view your emoji history</p>
+      </div>
+    )
+  }
+
+  if (isLoading) {
+    return (
+      <div className="w-full flex justify-center p-8">
+        <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="w-full text-center p-8 bg-red-50 rounded-lg">
+        <p className="text-red-500">{error}</p>
+      </div>
+    )
+  }
+
+  if (emojis.length === 0) {
+    return (
+      <div className="w-full text-center p-8 bg-gray-50 rounded-lg">
+        <p className="text-gray-500">You haven't generated any emojis yet</p>
       </div>
     )
   }
 
   return (
-    <div className="w-full max-w-2xl mx-auto mt-4">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2 bg-transparent px-3 py-1 rounded-full">
-          <History className="h-4 w-4 text-purple-300" />
-          <h3 className="text-sm font-medium text-purple-300">Your Emoji Collection</h3>
-        </div>
-
-        <div className="flex gap-1">
+    <div className="w-full">
+      <h2 className="text-xl font-semibold mb-4">Your Emojis</h2>
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+        {emojis.map((emoji) => (
           <div 
-            className="hover:scale-110 active:scale-90 transition"
-            style={{ transformOrigin: 'center' }}
+            key={emoji.id} 
+            className="relative group bg-white rounded-lg p-2 shadow-sm hover:shadow-md transition-shadow"
           >
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => scroll("left")}
-              className="h-8 w-8 rounded-full text-purple-300 hover:text-purple-400 hover:bg-transparent"
-            >
-              <ChevronLeft className="h-4 w-4" />
-              <span className="sr-only">Scroll left</span>
-            </Button>
-          </div>
-          <div 
-            className="hover:scale-110 active:scale-90 transition"
-            style={{ transformOrigin: 'center' }}
-          >
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => scroll("right")}
-              className="h-8 w-8 rounded-full text-purple-300 hover:text-purple-400 hover:bg-transparent"
-            >
-              <ChevronRight className="h-4 w-4" />
-              <span className="sr-only">Scroll right</span>
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      <div
-        ref={scrollContainerRef}
-        className="grid grid-flow-col auto-cols-max gap-4 overflow-x-auto pb-4 scrollbar-hide snap-x w-full"
-        style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
-      >
-        {emojiHistory.map((emoji, index) => (
-          <div
-            key={emoji.id}
-            className={`relative w-32 h-32 rounded-xl overflow-hidden cursor-pointer flex-shrink-0 snap-start hover:scale-105 transition-transform`}
-            style={{
-              opacity: 0,
-              scale: 0.8,
-              animation: `fadeIn 0.5s forwards ${index * 0.1}s, scaleIn 0.5s forwards ${index * 0.1}s`,
-              transformOrigin: 'center'
-            }}
-            onMouseEnter={() => setHoveredId(emoji.id)}
-            onMouseLeave={() => setHoveredId(null)}
-            onClick={() => setCurrentEmoji(emoji)}
-          >
-            <img 
-              src={emoji.imageUrl || "/placeholder.svg"} 
-              alt={emoji.prompt}
-              className="w-full h-full object-cover"
-            />
-            
-            {hoveredId === emoji.id && (
-              <div className="absolute inset-0 bg-gradient-to-br from-pink-500/60 to-purple-500/60 flex items-center justify-center gap-2 transition-opacity duration-300 ease-in-out backdrop-blur-sm">
-                <Button 
-                  size="sm" 
-                  variant="ghost" 
-                  className="h-8 w-8 p-0 bg-white/30 hover:bg-white/50 border-0" 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDownload(emoji);
-                  }}
-                >
-                  <Download className="h-4 w-4 text-white" />
-                </Button>
-                <Button 
-                  size="sm" 
-                  variant="ghost" 
-                  className="h-8 w-8 p-0 bg-white/30 hover:bg-white/50 border-0" 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleCopy(emoji);
-                  }}
-                >
-                  <Clipboard className="h-4 w-4 text-white" />
-                </Button>
-                <Button 
-                  size="sm" 
+            <div className="relative aspect-square overflow-hidden rounded-md">
+              <Image
+                src={emoji.url}
+                alt={emoji.prompt}
+                fill
+                className="object-cover"
+              />
+              
+              {/* Overlay with buttons on hover */}
+              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                <Button
+                  size="icon"
                   variant="ghost"
-                  className={`h-8 w-8 p-0 ${emoji.isFavorite ? 'bg-pink-400/50 hover:bg-pink-400/70' : 'bg-white/30 hover:bg-white/50'} border-0`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleFavorite(emoji.id);
-                  }}
+                  className="h-8 w-8 bg-white/80 hover:bg-white"
+                  onClick={() => handleDownload(emoji.url, emoji.prompt)}
+                  title="Download"
                 >
-                  <Heart className={`h-4 w-4 text-white ${emoji.isFavorite ? "fill-white" : ""}`} />
+                  <Download className="h-4 w-4" />
+                </Button>
+                
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className={`h-8 w-8 bg-white/80 hover:bg-white ${
+                    emoji.likes_num > 0 ? "text-red-500" : ""
+                  }`}
+                  onClick={() => likeEmoji(emoji.id, emoji.likes_num === 0)}
+                  title={emoji.likes_num > 0 ? "Unlike" : "Like"}
+                >
+                  <Heart className="h-4 w-4" fill={emoji.likes_num > 0 ? "currentColor" : "none"} />
+                </Button>
+                
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-8 w-8 bg-white/80 hover:bg-white"
+                  onClick={() => handleCopy(emoji.url, emoji.id)}
+                  title="Copy URL"
+                >
+                  {copiedId === emoji.id ? (
+                    <span className="text-xs font-medium">Copied!</span>
+                  ) : (
+                    <Copy className="h-4 w-4" />
+                  )}
                 </Button>
               </div>
-            )}
+            </div>
             
-            {emoji.isFavorite && !hoveredId && (
-              <div className="absolute top-1 right-1 text-pink-500 text-xs">❤️</div>
-            )}
+            <p className="mt-2 text-xs text-gray-500 truncate" title={emoji.prompt}>
+              {emoji.prompt}
+            </p>
           </div>
         ))}
       </div>
