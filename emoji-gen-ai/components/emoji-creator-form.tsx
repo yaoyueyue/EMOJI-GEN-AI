@@ -37,26 +37,44 @@ export function EmojiCreatorForm() {
   }
 
   const handleCreateEmoji = async (customPrompt?: string) => {
-    const promptToUse = customPrompt || prompt
+    const userPrompt = customPrompt || prompt
     
-    if (!promptToUse) {
+    if (!userPrompt) {
       console.log("No prompt value found")
       return
     }
 
+    // Append the Apple emoji style instruction to the user's prompt
+    const enhancedPrompt = `A TOK Emoji of ${userPrompt}. `
+
     setIsLoading(true)
     setErrorMessage(null)
-    console.log("Sending emoji generation request for:", promptToUse)
+    console.log("Sending emoji generation request for:", userPrompt)
+    console.log("Enhanced prompt:", enhancedPrompt)
     
     try {
       // Get the current origin for absolute URL construction
       const origin = window.location.origin
       
-      // Use the real emoji generation API
+      // Use the real emoji generation API with enhanced prompt and additional parameters
       const res = await fetch(`${origin}/api/generate-emoji`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: promptToUse })
+        body: JSON.stringify({
+          width: 1024,
+          height: 1024,
+          prompt: enhancedPrompt,
+          refine: "no_refiner",
+          scheduler: "K_EULER",
+          lora_scale: 0.6,
+          num_outputs: 1,
+          guidance_scale: 7.5,
+          apply_watermark: false,
+          high_noise_frac: 0.8,
+          negative_prompt: "",
+          prompt_strength: 0.8,
+          num_inference_steps: 50
+        })
       })
       
       console.log("API response status:", res.status)
@@ -98,10 +116,10 @@ export function EmojiCreatorForm() {
       console.log('Extracted imageUrl:', imageUrl)
 
       if (imageUrl) {
-        // Create new emoji object
+        // Create new emoji object with the ORIGINAL prompt (not enhanced)
         const newEmoji = {
           id: Date.now().toString(),
-          prompt: promptToUse,
+          prompt: userPrompt, // Store original prompt for display
           imageUrl: imageUrl,
           createdAt: new Date(),
           isFavorite: false

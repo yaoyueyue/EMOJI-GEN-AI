@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button"
 import { EmojiHistory } from "@/components/emoji-history"
 import { EmojiCreatorForm } from "@/components/emoji-creator-form"
 import { EmojiProvider } from "@/components/emoji-provider"
+import { AuthButtons } from "@/components/auth-buttons"
 
 export default function LandingPage() {
   return (
@@ -16,16 +17,11 @@ export default function LandingPage() {
           </span>
           {/* Darker EmojiGen without sparkle on right */}
           <span className="font-bold bg-gradient-to-r from-rose-400 to-purple-400 text-transparent bg-clip-text">
-            EmojiGen
+            EmojiGen AI
           </span>
         </div>
-        {/* Lighter login/signup text */}
-        <Button
-          variant="ghost"
-          className="text-purple-300 hover:text-purple-400 hover:bg-transparent rounded-full px-4 py-1 h-8 text-sm font-medium"
-        >
-          Login / Sign Up
-        </Button>
+        {/* Auth Buttons */}
+        <AuthButtons />
       </header>
 
       <EmojiProvider>

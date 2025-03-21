@@ -24,17 +24,29 @@ export function EmojiHistory() {
     })
   }
 
-  const handleCopy = async (prompt: string) => {
+  const handleCopy = async (emoji: any) => {
     try {
-      await navigator.clipboard.writeText(prompt)
+      // Fetch the image
+      const response = await fetch(emoji.imageUrl)
+      const blob = await response.blob()
+      
+      // Create a ClipboardItem with the image
+      const item = new ClipboardItem({
+        [blob.type]: blob
+      })
+      
+      // Copy to clipboard
+      await navigator.clipboard.write([item])
+      
       toast({
-        title: "Copied to clipboard! 📋",
-        description: prompt,
+        title: "Image copied to clipboard! 📋",
+        description: "You can now paste the emoji in other applications",
       })
     } catch (error) {
+      console.error('Copy error:', error)
       toast({
-        title: "Failed to copy 😢",
-        description: "Could not copy to clipboard",
+        title: "Failed to copy image 😢",
+        description: "Your browser may not support copying images or the feature might be restricted",
         variant: "destructive",
       })
     }
@@ -92,9 +104,9 @@ export function EmojiHistory() {
   return (
     <div className="w-full max-w-2xl mx-auto mt-4">
       <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2 bg-purple-100/30 px-3 py-1 rounded-full">
-          <History className="h-4 w-4 text-purple-400" />
-          <h3 className="text-sm font-medium text-purple-500">Your Emoji Collection</h3>
+        <div className="flex items-center gap-2 bg-transparent px-3 py-1 rounded-full">
+          <History className="h-4 w-4 text-purple-300" />
+          <h3 className="text-sm font-medium text-purple-300">Your Emoji Collection</h3>
         </div>
 
         <div className="flex gap-1">
@@ -106,7 +118,7 @@ export function EmojiHistory() {
               variant="ghost"
               size="icon"
               onClick={() => scroll("left")}
-              className="h-8 w-8 rounded-full bg-pink-100/30 text-purple-400 hover:text-purple-500 hover:bg-pink-100/50"
+              className="h-8 w-8 rounded-full text-purple-300 hover:text-purple-400 hover:bg-transparent"
             >
               <ChevronLeft className="h-4 w-4" />
               <span className="sr-only">Scroll left</span>
@@ -120,7 +132,7 @@ export function EmojiHistory() {
               variant="ghost"
               size="icon"
               onClick={() => scroll("right")}
-              className="h-8 w-8 rounded-full bg-pink-100/30 text-purple-400 hover:text-purple-500 hover:bg-pink-100/50"
+              className="h-8 w-8 rounded-full text-purple-300 hover:text-purple-400 hover:bg-transparent"
             >
               <ChevronRight className="h-4 w-4" />
               <span className="sr-only">Scroll right</span>
@@ -173,7 +185,7 @@ export function EmojiHistory() {
                   className="h-8 w-8 p-0 bg-white/30 hover:bg-white/50 border-0" 
                   onClick={(e) => {
                     e.stopPropagation();
-                    handleCopy(emoji.prompt);
+                    handleCopy(emoji);
                   }}
                 >
                   <Clipboard className="h-4 w-4 text-white" />
